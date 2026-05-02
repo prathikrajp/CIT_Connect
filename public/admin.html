@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Admin Dashboard | CIT Connect</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <div id="admin-auth" class="overlay active">
+        <div class="auth-box glass">
+            <h2 style="color: var(--danger); margin-bottom: 20px;">Admin Portal</h2>
+            <input type="password" id="admin-pass" placeholder="Master Password" autocomplete="off">
+            <div id="admin-error" class="error-text"></div>
+            <button id="admin-login-btn" class="danger-btn">AUTHENTICATE DIRECTORY</button>
+        </div>
+    </div>
+
+    <div id="admin-ui" class="main-container hidden">
+        <header>
+            <div class="brand">System Overwatch</div>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <button id="jump-user-btn" class="action-btn" style="padding: 5px 15px; font-size: 0.8rem; border-color: var(--magenta); color: var(--magenta);">START CHAT MODE</button>
+                <div class="stats">Total Online: <span id="total-users" style="font-weight: bold;">0</span></div>
+                <button id="logout-btn" class="danger-btn" style="padding: 5px 15px; font-size: 0.8rem; border-radius: 6px;">LOGOUT</button>
+            </div>
+        </header>
+
+        <div class="dashboard-grid">
+            <div class="users-panel glass">
+                <h3>Live Streams & Users</h3>
+                <div id="users-grid" class="users-grid">
+                </div>
+            </div>
+
+            <div class="side-column" style="display: flex; flex-direction: column; gap: 20px; overflow: hidden; min-height: 0;">
+                <div class="reports-panel glass" style="flex: 1.5; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 10px; min-height: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                        <h3 style="color: var(--primary); margin: 0; border: none; padding: 0;">System Login History</h3>
+                        <div style="display: flex; gap: 8px;">
+                            <button id="export-json-btn" class="action-btn" style="padding: 5px 12px; font-size: 0.8rem;">JSON</button>
+                            <button id="export-csv-btn" class="action-btn" style="padding: 5px 12px; font-size: 0.8rem;">CSV</button>
+                            <button id="export-pdf-btn" class="action-btn" style="padding: 5px 12px; font-size: 0.8rem;">PDF</button>
+                        </div>
+                    </div>
+                    <div id="history-list" class="reports-list" style="flex: 1; overflow-y: auto; padding-right: 5px;">
+                    </div>
+                </div>
+
+                <div class="reports-panel glass" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 10px; min-height: 0;">
+                    <h3 style="color: var(--danger); margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">Actionable Reports</h3>
+                    <div id="reports-list" class="reports-list" style="flex: 1; overflow-y: auto; padding-right: 5px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>

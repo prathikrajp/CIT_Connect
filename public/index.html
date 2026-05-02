@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CIT Connect Terminal</title>
+    <link rel="stylesheet" href="style.css">
+    <style>.hidden-force { display: none !important; }</style>
+</head>
+<body>
+
+    <div id="auth-overlay" class="overlay active">
+        <div class="auth-box glass">
+            <h2>Campus Connect</h2>
+            <input type="email" id="email-input" placeholder="Enter college mail id" autocomplete="off">
+            <input type="password" id="admin-pass" placeholder="Admin Password (leave blank if student)" style="margin-top: 15px; border-color: rgba(232, 121, 249, 0.4);" autocomplete="new-password">
+            <div id="auth-error" class="error-text"></div>
+            <button id="login-btn" class="primary-btn">ENTER TERMINAL</button>
+        </div>
+    </div>
+
+    <div id="main-ui" class="main-container hidden">
+        <header>
+            <div class="brand">CIT Connect Terminal</div>
+            <div style="display:flex; gap: 15px; align-items: center;">
+                <button id="return-dash-btn" class="danger-btn hidden-force" style="padding: 5px 15px; font-size: 0.8rem;">ADMIN DASHBOARD</button>
+                <div class="stats"><span id="online-count">0</span> Users Online</div>
+                <button id="logout-btn" class="danger-btn" style="padding: 5px 15px; font-size: 0.8rem; border-radius: 6px;">LOGOUT</button>
+            </div>
+            <div id="status" class="status-indicator">Awaiting verification...</div>
+        </header>
+
+        <div class="content-grid">
+            <main class="video-section">
+                <div class="video-wrapper local-wrapper">
+                    <video id="local-video" autoplay muted playsinline></video>
+                    <div class="video-overlay"><span class="badge blue">You</span></div>
+                </div>
+                <div class="video-wrapper remote-wrapper">
+                    <video id="remote-video" autoplay playsinline></video>
+                    <div class="video-overlay"><span class="badge magenta">Stranger</span></div>
+                </div>
+                
+                <div class="controls">
+                    <button id="report-btn" class="danger-btn" disabled>REPORT</button>
+                    <button id="next-btn" class="primary-btn" disabled>NEXT STRANGER</button>
+                </div>
+            </main>
+
+            <aside class="chat-section glass">
+                <div class="chat-header">Secure Chat</div>
+                <div id="messages" class="chat-messages"></div>
+                <div class="chat-input-area">
+                    <input type="file" id="fileInput" style="display: none;" />
+                    <button id="attach-btn" class="action-btn" style="padding: 10px; border-radius: 6px;" disabled title="Attach File">📎</button>
+                    <input type="text" id="msgInput" placeholder="Type a message..." disabled />
+                    <button id="send-btn" class="action-btn" disabled>SEND</button>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <canvas id="stream-canvas" style="display:none;"></canvas>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
