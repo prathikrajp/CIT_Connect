@@ -118,6 +118,7 @@ async function initMedia() {
         }
 
         localVideo.srcObject = localStream;
+        localVideo.muted = true; // Ensure muted via JS to bypass browser autoplay blocks
         
         // Explicitly play the video (fixes black screen on many browsers)
         localVideo.onloadedmetadata = () => {
