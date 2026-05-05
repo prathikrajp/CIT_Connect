@@ -3,66 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CIT Campus Link</title>
+    <title>CIT Campus Link 🎓</title>
     <link rel="stylesheet" href="style.css">
     <style>.hidden-force { display: none !important; }</style>
 </head>
 <body>
 
-    <div id="auth-overlay" class="overlay active">
-        <div class="auth-box glass">
-            <h2>CIT Campus Link</h2>
-            <input type="email" id="email-input" placeholder="Enter college mail id" autocomplete="off">
-            <input type="password" id="admin-pass" placeholder="Admin Password (leave blank if student)" style="margin-top: 15px; border-color: rgba(232, 121, 249, 0.4);" autocomplete="new-password">
-            <div id="auth-error" class="error-text"></div>
-            <button id="login-btn" class="primary-btn">ENTER TERMINAL</button>
+<!-- AUTH OVERLAY -->
+<div id="auth-overlay" class="overlay active">
+    <div class="auth-box">
+        <h2>CIT Campus Link</h2>
+        <p class="auth-subtitle">Secure real-time video chat for CIT students</p>
+
+        <div class="input-group">
+            <span class="input-icon">📧</span>
+            <input type="email" id="email-input" placeholder="name.dept2026@citchennai.net" autocomplete="off">
         </div>
-    </div>
+        <div class="input-group">
+            <span class="input-icon">🔐</span>
+            <input type="password" id="admin-pass" placeholder="Admin Password (leave blank if student)" autocomplete="new-password" style="border-color: rgba(168,85,247,0.3);">
+        </div>
 
-    <div id="main-ui" class="main-container hidden">
-        <header>
-            <div class="brand">CIT Campus Link</div>
-            <div style="display:flex; gap: 15px; align-items: center;">
-                <button id="return-dash-btn" class="danger-btn hidden-force" style="padding: 5px 15px; font-size: 0.8rem;">ADMIN DASHBOARD</button>
-                <div class="stats"><span id="online-count">0</span> Users Online</div>
-                <button id="logout-btn" class="danger-btn" style="padding: 5px 15px; font-size: 0.8rem; border-radius: 6px;">LOGOUT</button>
+        <div class="interests-section">
+            <div class="interests-label">⚡ Select Your Interests (optional)</div>
+            <div class="interests-grid" id="interest-chips">
+                <div class="interest-chip" data-val="coding">💻 Coding</div>
+                <div class="interest-chip" data-val="gaming">🎮 Gaming</div>
+                <div class="interest-chip" data-val="music">🎵 Music</div>
+                <div class="interest-chip" data-val="movies">🎬 Movies</div>
+                <div class="interest-chip" data-val="sports">⚽ Sports</div>
+                <div class="interest-chip" data-val="anime">🎌 Anime</div>
+                <div class="interest-chip" data-val="study">📚 Study</div>
+                <div class="interest-chip" data-val="memes">😂 Memes</div>
             </div>
-            <div id="status" class="status-indicator">Awaiting verification...</div>
-        </header>
+        </div>
 
-        <div class="content-grid">
-            <main class="video-section">
+        <div id="auth-error" class="error-text"></div>
+        <button id="login-btn" class="primary-btn"><span>ENTER TERMINAL →</span></button>
+    </div>
+</div>
+
+<!-- MAIN UI -->
+<div id="main-ui" class="main-container hidden">
+    <header>
+        <div class="brand">CIT Campus Link</div>
+        <div class="status-indicator" id="status">Initializing...</div>
+        <div class="header-controls">
+            <div class="online-pill">🟢 <span id="online-count">0</span> Online</div>
+            <button id="return-dash-btn" class="violet-btn hidden-force" style="font-size:0.75rem; padding:6px 12px;">📊 ADMIN</button>
+            <button id="logout-btn" class="danger-btn">✕ LOGOUT</button>
+        </div>
+    </header>
+
+    <div class="content-grid">
+        <!-- VIDEO + CONTROLS -->
+        <div class="video-section">
+            <div class="videos-row">
+                <!-- LOCAL VIDEO -->
                 <div class="video-wrapper local-wrapper">
                     <video id="local-video" autoplay muted playsinline></video>
-                    <div class="video-overlay"><span class="badge blue">You</span></div>
+                    <div class="no-cam-overlay hidden" id="local-nocam">📷<span>Camera Off</span></div>
+                    <div class="video-label label-you">YOU</div>
+                    <div class="video-controls">
+                        <button class="icon-btn" id="toggle-cam-btn" title="Toggle Camera">📷</button>
+                        <button class="icon-btn" id="toggle-mic-btn" title="Toggle Mic">🎤</button>
+                        <button class="icon-btn" id="switch-cam-btn" title="Switch Camera">🔄</button>
+                    </div>
                 </div>
+
+                <!-- REMOTE VIDEO -->
                 <div class="video-wrapper remote-wrapper">
                     <video id="remote-video" autoplay playsinline></video>
-                    <div class="video-overlay"><span class="badge magenta">Stranger</span></div>
+                    <div class="no-cam-overlay" id="remote-nocam">👤<span>Waiting...</span></div>
+                    <div class="video-label label-stranger">STRANGER</div>
+                    <div class="volume-bar">
+                        <span>🔊</span>
+                        <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="100">
+                    </div>
                 </div>
-                
-                <div class="controls">
-                    <button id="report-btn" class="danger-btn" disabled>REPORT</button>
-                    <button id="next-btn" class="primary-btn" disabled>NEXT STRANGER</button>
-                </div>
-            </main>
+            </div>
 
-            <aside class="chat-section glass">
-                <div class="chat-header">Secure Chat</div>
-                <div id="messages" class="chat-messages"></div>
-                <div class="chat-input-area">
-                    <input type="file" id="fileInput" style="display: none;" />
-                    <button id="attach-btn" class="action-btn" style="padding: 10px; border-radius: 6px;" disabled title="Attach File">📎</button>
-                    <input type="text" id="msgInput" placeholder="Type a message..." disabled />
-                    <button id="send-btn" class="action-btn" disabled>SEND</button>
-                </div>
-            </aside>
+            <!-- CONTROLS -->
+            <div class="controls">
+                <button class="panic-btn" id="panic-btn" disabled>⚡ PANIC EXIT</button>
+                <button class="action-btn" id="report-btn" disabled>🚨 REPORT</button>
+                <button class="action-btn violet-btn" id="block-btn" disabled>🚫 BLOCK</button>
+                <button class="next-btn" id="next-btn" disabled>⏭ NEXT STRANGER</button>
+            </div>
+        </div>
+
+        <!-- CHAT SECTION -->
+        <div class="chat-section">
+            <div class="chat-header">
+                <div class="chat-status-dot" id="chat-dot"></div>
+                <div class="chat-header-title">SECURE CHAT</div>
+            </div>
+
+            <div class="icebreaker-bar" id="icebreaker-bar">
+                <span class="ice-icon">🧊</span>
+                <span class="icebreaker-text" id="icebreaker-text">Click for an icebreaker question!</span>
+            </div>
+
+            <div id="messages" class="chat-messages">
+                <div class="msg msg-system" style="margin-top: 20px;">🔐 End-to-end encrypted channel. Connect to start chatting.</div>
+            </div>
+
+            <div class="typing-indicator" id="typing-indicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+
+            <div class="emoji-row">
+                <button class="emoji-btn" data-emoji="👍" disabled id="e1">👍</button>
+                <button class="emoji-btn" data-emoji="😂" disabled id="e2">😂</button>
+                <button class="emoji-btn" data-emoji="❤️" disabled id="e3">❤️</button>
+                <button class="emoji-btn" data-emoji="🔥" disabled id="e4">🔥</button>
+                <button class="emoji-btn" data-emoji="👋" disabled id="e5">👋</button>
+            </div>
+
+            <div class="chat-input-area">
+                <input type="file" id="fileInput" style="display:none;" />
+                <button class="attach-btn-icon" id="attach-btn" disabled title="Attach File">📎</button>
+                <input type="text" id="msgInput" placeholder="Type a message..." disabled />
+                <button class="send-btn" id="send-btn" disabled>➤</button>
+            </div>
         </div>
     </div>
+</div>
 
-    <canvas id="stream-canvas" style="display:none;"></canvas>
+<!-- NOTIFICATION TOAST -->
+<div class="notif-toast" id="notif-toast"></div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js"></script>
+<canvas id="stream-canvas"></canvas>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
