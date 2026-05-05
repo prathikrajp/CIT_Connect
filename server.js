@@ -42,7 +42,7 @@ function broadcastAdminUpdate() {
 io.on('connection', (socket) => {
     // --- AUTHENTICATION ---
     socket.on('login', (data) => {
-        const { email, password, isAdmin, overrideAsUser, interests } = data;
+        const { email, password, isAdmin, overrideAsUser } = data;
         const normalizedEmail = email ? email.trim().toLowerCase() : '';
 
         // Admin Dash
@@ -67,8 +67,7 @@ io.on('connection', (socket) => {
                 info: adminInfo,
                 status: 'waiting',
                 partnerId: null,
-                lastPartnerId: null,
-                interests: interests || []
+                lastPartnerId: null
             });
             loginHistory.push({
                 email: 'ADMINISTRATOR',
@@ -117,8 +116,7 @@ io.on('connection', (socket) => {
             info: userInfo,
             status: 'waiting',
             partnerId: null,
-            lastPartnerId: null,
-            interests: interests || []
+            lastPartnerId: null
         });
 
         socket.emit('login_success', { isAdmin: false });
@@ -144,19 +142,11 @@ io.on('connection', (socket) => {
             waitingQueue = waitingQueue.filter(id => id !== socketId);
             let matchId = null;
 
-            // Prioritize Interest Matching
-            const interestMatches = waitingQueue.filter(id => {
-                const other = users.get(id);
-                return other && other.interests.some(i => user.interests.includes(i));
-            });
-
             const freshMatches = waitingQueue.filter(id => id !== user.lastPartnerId && users.has(id));
-            
-            if (interestMatches.length > 0) {
-                matchId = interestMatches[Math.floor(Math.random() * interestMatches.length)];
-            } else if (freshMatches.length > 0) {
+            if (freshMatches.length > 0) {
                 matchId = freshMatches[Math.floor(Math.random() * freshMatches.length)];
             } else if (waitingQueue.length > 0) {
+                // Fallback to exactly who we disconnected from immediately if nobody new is found
                 matchId = waitingQueue[Math.floor(Math.random() * waitingQueue.length)];
             }
 
@@ -234,13 +224,6 @@ io.on('connection', (socket) => {
         const user = users.get(socket.id);
         if (user && user.partnerId) {
             io.to(user.partnerId).emit('chat_received', msgId);
-        }
-    });
-
-    socket.on('typing', (isTyping) => {
-        const user = users.get(socket.id);
-        if (user && user.partnerId) {
-            io.to(user.partnerId).emit('typing', isTyping);
         }
     });
 
