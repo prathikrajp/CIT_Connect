@@ -1,43 +1,110 @@
-const socket = io();
+'use strict';
 
-// UI Elements
-const authOverlay = document.getElementById('auth-overlay');
-const mainUi = document.getElementById('main-ui');
-const emailInput = document.getElementById('email-input');
-const loginBtn = document.getElementById('login-btn');
-const authError = document.getElementById('auth-error');
+// ── Socket ────────────────────────────────────────────────────────────────────
+const socket = io({ transports: ['websocket', 'polling'] });
 
-const localVideo = document.getElementById('local-video');
-const remoteVideo = document.getElementById('remote-video');
-const statusText = document.getElementById('status');
-const onlineCount = document.getElementById('online-count');
-const nextBtn = document.getElementById('next-btn');
-const reportBtn = document.getElementById('report-btn');
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const authOverlay     = $('auth-overlay');
+const mainUi          = $('main-ui');
+const emailInput      = $('email-input');
+const adminPassInput  = $('admin-pass');
+const adminPassGroup  = $('admin-pass-group');
+const loginBtn        = $('login-btn');
+const authError       = $('auth-error');
+const statusEl        = $('status');
+const statusChip      = $('status-chip');
+const onlineCount     = $('online-count');
+const nextBtn         = $('next-btn');
+const reportBtn       = $('report-btn');
+const panicBtn        = $('panic-btn');
+const blockBtn        = $('block-btn');
+const messagesDiv     = $('messages');
+const msgInput        = $('msgInput');
+const sendBtn         = $('send-btn');
+const attachBtn       = $('attach-btn');
+const fileInput       = $('fileInput');
+const localVideo      = $('local-video');
+const remoteVideo     = $('remote-video');
+const remoteNocam     = $('remote-nocam');
+const localNocam      = $('local-nocam');
+const searchOverlay   = $('searching-overlay');
+const searchTitle     = $('search-title');
+const searchSub       = $('search-sub');
+const sOnline         = $('s-online');
+const sQueue          = $('s-queue');
+const typingIndicator = $('typing-indicator');
+const chatDot         = $('chat-dot');
+const qualityBadge    = $('quality-badge');
+const qualityLabel    = $('quality-label');
+const qualityBars     = document.querySelectorAll('.qb');
+const volSlider       = $('volume-slider');
+const streamCanvas    = $('stream-canvas');
+const thumbCtx        = streamCanvas.getContext('2d');
+const notifToast      = $('notif-toast');
+const icebreakerBar   = $('icebreaker-bar');
+const icebreakerText  = $('icebreaker-text');
+const toggleAdminBtn  = $('toggle-admin-btn');
+const returnDashBtn   = $('return-dash-btn');
 
-const messagesDiv = document.getElementById('messages');
-const msgInput = document.getElementById('msgInput');
-const sendBtn = document.getElementById('send-btn');
-const attachBtn = document.getElementById('attach-btn');
-const fileInput = document.getElementById('fileInput');
-const streamCanvas = document.getElementById('stream-canvas');
-const ctx = streamCanvas.getContext('2d');
+// ── State ─────────────────────────────────────────────────────────────────────
+let localStream       = null;
+let peerConnection    = null;
+let currentPartnerId  = null;
+let camEnabled        = true;
+let micEnabled        = true;
+let facingMode        = 'user';
+let thumbInterval     = null;
+let typingTimeout     = null;
+let statsInterval     = null;
+let isSearching       = false;
 
-let localStream;
-let peerConnection;
-let currentPartnerId = null;
-let streamInterval;
+// ── ICE Config — STUN + free TURN (Open Relay) ───────────────────────────────
+const RTC_CONFIG = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        }
+    ]
+};
 
-const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+// ── Icebreakers ───────────────────────────────────────────────────────────────
+const ICEBREAKERS = [
+    'What project are you currently building? 💻',
+    'Favourite coding language and why? 🔥',
+    'CS or non-CS? What do you study? 📚',
+    'Best movie you watched recently? 🎬',
+    'Would you rather: unlimited RAM or unlimited SSD? 😂',
+    'What song is on repeat right now? 🎵',
+    'Favourite professor at CIT? 👨‍🏫',
+    'Tea or coffee during exams? ☕',
+    'What game are you playing these days? 🎮',
+    'Morning class or evening class preference? ⏰'
+];
+let icebreakerIndex = 0;
 
-// Quick login from dashboard logic
-const urlParams = new URLSearchParams(window.location.search);
+// ── Admin URL shortcut ────────────────────────────────────────────────────────
+const urlParams      = new URLSearchParams(window.location.search);
 const quickAdminPass = urlParams.get('admin_pass');
-
 if (quickAdminPass) {
-    document.getElementById('admin-pass').value = quickAdminPass;
-    const btn = document.getElementById('return-dash-btn');
-    btn.classList.remove('hidden-force');
-    btn.onclick = () => window.location.href = `admin.html?pass=${encodeURIComponent(quickAdminPass)}`;
+    adminPassInput.value = quickAdminPass;
+    adminPassGroup.style.display = 'block';
+    returnDashBtn.classList.remove('hidden-force');
+    returnDashBtn.onclick = () => { window.location.href = `admin.html?pass=${encodeURIComponent(quickAdminPass)}`; };
 }
 
 socket.on('connect', () => {
@@ -46,393 +113,544 @@ socket.on('connect', () => {
     }
 });
 
-// --- AUTHENTICATION ---
-document.getElementById('logout-btn').addEventListener('click', () => {
-    window.location.href = window.location.pathname;
+// ── Admin toggle ──────────────────────────────────────────────────────────────
+toggleAdminBtn.addEventListener('click', () => {
+    const shown = adminPassGroup.style.display !== 'none';
+    adminPassGroup.style.display = shown ? 'none' : 'block';
+    toggleAdminBtn.textContent = shown ? 'Show admin field' : 'Hide admin field';
 });
 
-loginBtn.addEventListener('click', () => {
+// ── Interest chips ────────────────────────────────────────────────────────────
+document.querySelectorAll('.interest-chip').forEach(chip => {
+    chip.addEventListener('click', () => chip.classList.toggle('active'));
+});
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+loginBtn.addEventListener('click', doLogin);
+emailInput.addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
+
+function doLogin() {
+    authError.textContent = '';
     const email = emailInput.value.trim().toLowerCase();
-    const passInput = document.getElementById('admin-pass');
-    
-    // Standard User Login (Protected from secret Chrome autofill collisions)
-    if (email && email !== 'admin') {
-        const emailRegex = /^(.+)\.([a-z]+)(\d{4})@citchennai\.(net|edu)$/;
-        if (!emailRegex.test(email)) {
-            authError.innerText = "Invalid format (e.g., name.dept2026@citchennai.net)";
-            return;
-        }
-        socket.emit('login', { email, isAdmin: false });
-        return;
-    }
+    const pass  = adminPassInput.value.trim();
 
-    // Admin Override Branch
-    if (passInput && passInput.value) {
+    if (email === 'admin' || (!email && pass)) {
+        if (!pass) { authError.textContent = 'Enter admin password.'; return; }
         if (email === 'admin') {
-            // Join pool as User Simulator
-            const btn = document.getElementById('return-dash-btn');
-            btn.classList.remove('hidden-force');
-            btn.onclick = () => window.location.href = `admin.html?pass=${encodeURIComponent(passInput.value)}`;
-
-            socket.emit('login', { password: passInput.value, isAdmin: false, overrideAsUser: true });
+            returnDashBtn.classList.remove('hidden-force');
+            returnDashBtn.onclick = () => { window.location.href = `admin.html?pass=${encodeURIComponent(pass)}`; };
+            socket.emit('login', { password: pass, isAdmin: false, overrideAsUser: true });
         } else {
-            // Bypass to Dashboard
-            window.location.href = `admin.html?pass=${encodeURIComponent(passInput.value)}`;
+            window.location.href = `admin.html?pass=${encodeURIComponent(pass)}`;
         }
         return;
     }
 
-    authError.innerText = "College mail id is required.";
-});
+    const re = /^(.+)\.([a-z]+)(\d{4})@citchennai\.(net|edu)$/;
+    if (!re.test(email)) {
+        authError.textContent = 'Invalid format. Use: name.dept2026@citchennai.net';
+        return;
+    }
+    socket.emit('login', { email, isAdmin: false });
+}
 
-socket.on('login_error', (msg) => { authError.innerText = msg; });
+socket.on('login_error', msg => { authError.textContent = msg; });
+socket.on('show_admin_btn', () => {
+    returnDashBtn.classList.remove('hidden-force');
+});
 
 socket.on('login_success', () => {
     authOverlay.classList.add('hidden');
     mainUi.classList.remove('hidden');
+    initMedia();
 });
 
-// --- MEDIA & ADMIN STREAMING ---
+// ── Logout ────────────────────────────────────────────────────────────────────
+$('logout-btn').addEventListener('click', () => { window.location.href = window.location.pathname; });
+
+// ── Media ─────────────────────────────────────────────────────────────────────
 async function initMedia() {
     try {
-        statusText.innerText = "Requesting media...";
-        
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error("Browser doesn't support camera or insecure connection (Need HTTPS/Localhost)");
-        }
+        setStatus('Requesting camera...', 'searching');
 
-        // Fallback-safe constraints
         const constraints = {
-            video: { 
-                width: { ideal: 1280, max: 1920 }, 
-                height: { ideal: 720, max: 1080 },
-                facingMode: "user"
-            },
-            audio: { echoCancellation: true, noiseSuppression: true }
+            video: { width:{ideal:854,max:1280}, height:{ideal:480,max:720}, facingMode },
+            audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true }
         };
 
         try {
-            console.log("Attempting camera with ideal constraints...");
             localStream = await navigator.mediaDevices.getUserMedia(constraints);
-        } catch (e) {
-            console.warn("Ideal constraints failed, trying basic video/audio", e);
-            localStream = await navigator.mediaDevices.getUserMedia({ 
-                video: true, 
-                audio: true 
-            });
+        } catch {
+            // Fallback: audio only or basic video
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
+            } catch {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+                showNoCam(true);
+            }
         }
 
-        if (!localStream) throw new Error("Failed to acquire local stream.");
-
         localVideo.srcObject = localStream;
-        localVideo.muted = true; 
-        
-        // Explicitly play and handle potential blocks
-        localVideo.onloadedmetadata = () => {
-            localVideo.play().catch(e => {
-                console.error("Auto-play failed:", e);
-                statusText.innerText = "Click to enable camera";
-                localVideo.onclick = () => localVideo.play();
-            });
-        };
-        
-        // Accelerated Ultra-Clear Admin Preview Feeds:
-        streamCanvas.width = 480; 
-        streamCanvas.height = 360;
-        if (streamInterval) clearInterval(streamInterval);
-        streamInterval = setInterval(() => {
-            if (localVideo.readyState === localVideo.HAVE_ENOUGH_DATA) {
-                ctx.drawImage(localVideo, 0, 0, streamCanvas.width, streamCanvas.height);
-                const frameData = streamCanvas.toDataURL('image/jpeg', 0.6); // Slightly lower quality for bandwidth
-                socket.emit('video_frame', frameData);
-            }
-        }, 500); // Reduced frequency slightly for better performance
+        localVideo.muted = true;
+        localVideo.onloadedmetadata = () => localVideo.play().catch(() => {});
 
-        // Mugshot capture
-        setTimeout(() => {
-            if (localStream && localVideo.readyState === localVideo.HAVE_ENOUGH_DATA) {
-                const profileCap = document.createElement('canvas');
-                profileCap.width = 320; profileCap.height = 240;
-                profileCap.getContext('2d').drawImage(localVideo, 0, 0, 320, 240);
-                socket.emit('register_face_capture', profileCap.toDataURL('image/jpeg', 0.8));
-            }
-        }, 3000);
+        // Admin thumbnail — every 3s for live admin preview
+        if (thumbInterval) clearInterval(thumbInterval);
+        thumbInterval = setInterval(sendThumbnail, 3000);
 
-    } catch (error) {
-        console.error("Camera Error:", error);
-        statusText.innerText = "Camera Error: " + error.message;
-        statusText.style.color = "var(--danger)";
-        
-        // Add a retry button to the status text area
-        const retryBtn = document.createElement('button');
-        retryBtn.innerText = "RETRY CAMERA";
-        retryBtn.style.cssText = "margin-left: 10px; padding: 4px 8px; font-size: 0.7rem; background: var(--danger); color: white; border-radius: 4px; cursor: pointer;";
-        retryBtn.onclick = () => initMedia();
-        statusText.appendChild(retryBtn);
+        // Face capture once after 3s
+        setTimeout(captureFace, 3000);
+
+    } catch (err) {
+        console.error('Media error:', err);
+        showNoCam(true);
+        setStatus('No camera — text-only mode', 'disconnected');
     }
 }
 
-// --- WEBRTC ---
-let remoteVideoLastTime = -1;
-setInterval(() => {
-    if (currentPartnerId && remoteVideo.srcObject) {
-        // Anti-freeze kickstarter: flushes the video tag stream decode if frames appear stuck for 2 seconds.
-        if (remoteVideo.currentTime === remoteVideoLastTime && remoteVideo.currentTime > 0) {
-            const stream = remoteVideo.srcObject;
-            remoteVideo.srcObject = null;
-            remoteVideo.srcObject = stream;
-            remoteVideo.play().catch(()=>{});
-        }
-        remoteVideoLastTime = remoteVideo.currentTime;
-    }
-}, 2000);
+function sendThumbnail() {
+    if (!localVideo.readyState) return;
+    streamCanvas.width = 320; streamCanvas.height = 240;
+    thumbCtx.drawImage(localVideo, 0, 0, 320, 240);
+    socket.emit('thumbnail', streamCanvas.toDataURL('image/jpeg', 0.5));
+}
 
-function closePeerConnection() {
+function captureFace() {
+    if (!localStream || !localVideo.readyState) return;
+    const c = document.createElement('canvas');
+    c.width = 240; c.height = 180;
+    c.getContext('2d').drawImage(localVideo, 0, 0, 240, 180);
+    socket.emit('register_face_capture', c.toDataURL('image/jpeg', 0.75));
+}
+
+function showNoCam(local) {
+    if (local) { localNocam.classList.remove('hidden'); }
+}
+
+// Camera / Mic toggles
+$('toggle-cam-btn').addEventListener('click', () => {
+    if (!localStream) return;
+    camEnabled = !camEnabled;
+    localStream.getVideoTracks().forEach(t => { t.enabled = camEnabled; });
+    $('toggle-cam-btn').classList.toggle('muted', !camEnabled);
+    localNocam.classList.toggle('hidden', camEnabled);
+});
+
+$('toggle-mic-btn').addEventListener('click', () => {
+    if (!localStream) return;
+    micEnabled = !micEnabled;
+    localStream.getAudioTracks().forEach(t => { t.enabled = micEnabled; });
+    $('toggle-mic-btn').classList.toggle('muted', !micEnabled);
+});
+
+$('switch-cam-btn').addEventListener('click', async () => {
+    facingMode = facingMode === 'user' ? 'environment' : 'user';
+    if (localStream) {
+        localStream.getVideoTracks().forEach(t => t.stop());
+    }
+    await initMedia();
+    if (peerConnection && localStream) {
+        const vTrack = localStream.getVideoTracks()[0];
+        const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
+        if (sender && vTrack) sender.replaceTrack(vTrack);
+    }
+});
+
+// Volume
+volSlider.addEventListener('input', () => {
+    remoteVideo.volume = volSlider.value / 100;
+});
+
+// ── WebRTC ────────────────────────────────────────────────────────────────────
+function closePeer() {
+    clearInterval(statsInterval);
     if (peerConnection) {
         peerConnection.onicecandidate = null;
         peerConnection.ontrack = null;
+        peerConnection.onconnectionstatechange = null;
         peerConnection.close();
         peerConnection = null;
     }
     remoteVideo.srcObject = null;
+    remoteNocam.classList.remove('hidden');
     currentPartnerId = null;
+    qualityBadge.classList.add('hidden');
     disableChat();
 }
 
-function createPeerConnection(partnerId, isInitiator) {
-    closePeerConnection();
+function createPeer(partnerId, initiator) {
+    closePeer();
     currentPartnerId = partnerId;
-    peerConnection = new RTCPeerConnection(rtcConfig);
+    peerConnection = new RTCPeerConnection(RTC_CONFIG);
 
-    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+    // Add local tracks
+    if (localStream) {
+        localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+    }
 
-    peerConnection.ontrack = (event) => { remoteVideo.srcObject = event.streams[0]; };
-
-    peerConnection.onicecandidate = (event) => {
-        if (event.candidate) socket.emit('webrtc_ice_candidate', { partnerId, candidate: event.candidate });
+    // Remote track
+    peerConnection.ontrack = e => {
+        remoteVideo.srcObject = e.streams[0];
+        remoteNocam.classList.add('hidden');
+        startQualityMonitor();
     };
 
-    if (isInitiator) {
-        peerConnection.createOffer()
-            .then(offer => peerConnection.setLocalDescription(offer))
-            .then(() => socket.emit('webrtc_offer', { partnerId, offer: peerConnection.localDescription }));
+    // ICE
+    peerConnection.onicecandidate = e => {
+        if (e.candidate) socket.emit('webrtc_ice_candidate', { partnerId, candidate: e.candidate });
+    };
+
+    // Connection state
+    peerConnection.onconnectionstatechange = () => {
+        const s = peerConnection?.connectionState;
+        if (s === 'failed' || s === 'disconnected') {
+            showToast('⚠ Connection unstable — reconnecting...');
+        }
+    };
+
+    if (initiator) {
+        peerConnection.createOffer({ offerToReceiveAudio:true, offerToReceiveVideo:true })
+            .then(o => peerConnection.setLocalDescription(o))
+            .then(() => {
+                socket.emit('webrtc_offer', { partnerId, offer: peerConnection.localDescription });
+                // Boost video bitrate for better quality
+                setBitrate(1500);
+            })
+            .catch(console.error);
     }
 }
 
-// --- SOCKET EVENTS ---
-socket.on('online_count', (count) => { onlineCount.innerText = count; });
+// Set video bitrate for better quality
+async function setBitrate(kbps) {
+    if (!peerConnection) return;
+    try {
+        const senders = peerConnection.getSenders();
+        for (const sender of senders) {
+            if (sender.track?.kind === 'video') {
+                const params = sender.getParameters();
+                if (!params.encodings) params.encodings = [{}];
+                params.encodings[0].maxBitrate = kbps * 1000;
+                await sender.setParameters(params);
+            }
+        }
+    } catch(e) { console.warn('Bitrate set failed:', e); }
+}
 
-socket.on('waiting_status', (text) => {
-    if (text === 'Searching...') {
-        statusText.innerHTML = `<style>@keyframes glowspin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style><div style="display:inline-block; border:2px solid; border-radius:50%; width:10px; height:10px; border-color:var(--magenta) transparent var(--primary) transparent; animation:glowspin 1s linear infinite; margin-right:6px; vertical-align:middle;"></div> Searching for stranger...`;
-    } else {
-        statusText.innerText = text;
-    }
-    statusText.style.color = "var(--text-muted)";
-    closePeerConnection();
-    nextBtn.disabled = true;
+// Connection quality monitor
+function startQualityMonitor() {
+    clearInterval(statsInterval);
+    qualityBadge.classList.remove('hidden');
+    statsInterval = setInterval(async () => {
+        if (!peerConnection) return;
+        try {
+            const stats = await peerConnection.getStats();
+            stats.forEach(r => {
+                if (r.type === 'inbound-rtp' && r.kind === 'video') {
+                    const loss = r.packetsLost || 0;
+                    const recv = r.packetsReceived || 1;
+                    const ratio = loss / (loss + recv);
+                    let bars = 4, label = 'Excellent', col = 'var(--green)';
+                    if (ratio > 0.15) { bars = 1; label = 'Poor';   col = 'var(--danger)'; }
+                    else if (ratio > 0.08) { bars = 2; label = 'Fair'; col = 'var(--yellow)'; }
+                    else if (ratio > 0.03) { bars = 3; label = 'Good'; col = 'var(--cyan)'; }
+                    qualityLabel.textContent = label;
+                    qualityBars.forEach((b, i) => {
+                        b.classList.toggle('active', i < bars);
+                        if (i < bars) b.style.background = col;
+                    });
+                }
+            });
+        } catch {}
+    }, 3000);
+}
+
+// ── Socket events ─────────────────────────────────────────────────────────────
+socket.on('pong', () => {}); // heartbeat ack
+
+socket.on('online_count', n => {
+    onlineCount.textContent = n;
+    sOnline.textContent = n;
 });
 
-socket.on('partner_found', (data) => {
-    statusText.innerText = "Connected to a stranger.";
-    statusText.style.color = "var(--magenta)";
-    nextBtn.disabled = false;
+socket.on('waiting_status', data => {
+    closePeer();
+    isSearching = true;
+    searchOverlay.classList.remove('hidden');
+    setStatus('Searching...', 'searching');
+    panicBtn.disabled = true;
+    reportBtn.disabled = true;
+    blockBtn.disabled  = true;
+
+    if (data.type === 'no_users') {
+        searchTitle.textContent = data.message || 'Waiting for users...';
+        searchSub.textContent   = 'You\'ll be matched automatically when someone joins!';
+    } else {
+        searchTitle.textContent = '🔍 Searching for strangers...';
+        searchSub.textContent   = 'Finding you the best match...';
+    }
+    if (data.online !== undefined) sOnline.textContent = data.online;
+    if (data.queue  !== undefined) sQueue.textContent  = data.queue;
+});
+
+socket.on('partner_found', data => {
+    isSearching = false;
+    searchOverlay.classList.add('hidden');
+    setStatus('🟢 Connected to a stranger', 'connected');
+    panicBtn.disabled  = false;
     reportBtn.disabled = false;
-    createPeerConnection(data.partnerId, data.initiator);
+    blockBtn.disabled  = false;
+    createPeer(data.partnerId, data.initiator);
     enableChat();
-    appendSystemMessage("You are now chatting with a stranger.");
+    sysMsg('You are now connected with a stranger. Say hi! 👋');
+    showToast('🎉 Stranger connected!');
+    icebreakerBar.classList.remove('hidden');
 });
 
 socket.on('partner_disconnected', () => {
-    statusText.innerText = "Stranger disconnected.";
-    appendSystemMessage("Stranger disconnected.");
-    closePeerConnection();
-    nextBtn.disabled = true;
+    setStatus('Stranger disconnected', 'disconnected');
+    sysMsg('Stranger has disconnected.');
+    closePeer();
+    panicBtn.disabled  = true;
     reportBtn.disabled = true;
+    blockBtn.disabled  = true;
+    showToast('👋 Stranger left. Click Next to find another!');
+    isSearching = false;
+    searchOverlay.classList.add('hidden');
+});
+
+socket.on('cooldown', data => {
+    showToast(`⏳ Wait ${Math.ceil(data.ms / 1000)}s before skipping again`);
 });
 
 socket.on('kicked', () => {
-    alert("You have been removed by an Administrator.");
+    alert('You have been removed by an Administrator.');
     window.location.reload();
 });
 
-// SIGNALING EVENTS
-socket.on('webrtc_offer', async (data) => {
+// WebRTC signaling
+socket.on('webrtc_offer', async data => {
     if (!peerConnection || currentPartnerId !== data.partnerId) return;
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-    const answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer);
-    socket.emit('webrtc_answer', { partnerId: currentPartnerId, answer: peerConnection.localDescription });
+    try {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const ans = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(ans);
+        socket.emit('webrtc_answer', { partnerId: currentPartnerId, answer: peerConnection.localDescription });
+    } catch (e) { console.error(e); }
 });
 
-socket.on('webrtc_answer', async (data) => {
+socket.on('webrtc_answer', async data => {
     if (peerConnection && currentPartnerId === data.partnerId) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        try { await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer)); }
+        catch (e) { console.error(e); }
     }
 });
 
-socket.on('webrtc_ice_candidate', async (data) => {
+socket.on('webrtc_ice_candidate', async data => {
     if (peerConnection && currentPartnerId === data.partnerId) {
-        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        try { await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); }
+        catch (e) { console.error(e); }
     }
 });
 
-// Incoming Chat
-socket.on('chat', (data) => {
-    appendMessage(data, 'msg-stranger');
+// Chat
+socket.on('chat', data => {
+    appendMsg(data, 'msg-stranger');
     if (data.id) socket.emit('chat_received', data.id);
 });
 
-// Read Receipts
-socket.on('chat_received', (msgId) => {
-    const tick = document.getElementById(`status-${msgId}`);
-    if (tick) {
-        tick.innerText = '✓✓';
-        tick.style.color = 'var(--primary)';
-    }
+socket.on('chat_received', id => {
+    const tick = document.getElementById('tick-' + id);
+    if (tick) { tick.textContent = '✓✓'; tick.style.color = 'var(--cyan)'; }
 });
 
-// --- CHAT & CONTROLS ---
-function appendMessage(data, type) {
-    const div = document.createElement('div');
-    div.className = `msg ${type}`;
-    
-    const text = typeof data === 'string' ? data : data.text;
-    const msgId = typeof data === 'string' ? null : data.id;
-    
-    if (type === 'msg-self' && msgId) {
-        const textNode = document.createElement('span');
-        textNode.innerText = text;
-        const tickNode = document.createElement('span');
-        tickNode.id = `status-${msgId}`;
-        tickNode.innerText = '✓';
-        tickNode.style.cssText = 'font-size: 0.75rem; color: #64748b; margin-left: 8px; float: right; margin-top: 2px;';
-        div.appendChild(textNode);
-        div.appendChild(tickNode);
+// Typing
+let remoteTypingTimer = null;
+socket.on('typing', isTyping => {
+    if (isTyping) {
+        typingIndicator.classList.add('show');
+        clearTimeout(remoteTypingTimer);
+        remoteTypingTimer = setTimeout(() => typingIndicator.classList.remove('show'), 3000);
     } else {
-        div.innerText = text;
-    }
-    
-    messagesDiv.appendChild(div);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-}
-
-function appendSystemMessage(text, id = null) {
-    const div = document.createElement('div');
-    if (id) div.id = id;
-    div.className = 'msg msg-system';
-    div.innerText = text;
-    messagesDiv.appendChild(div);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-}
-
-function sendMessage() {
-    const msg = msgInput.value.trim();
-    if (msg && currentPartnerId) {
-        const payload = { id: 'msg-' + Date.now(), text: msg };
-        socket.emit("chat", payload);
-        appendMessage(payload, 'msg-self');
-        msgInput.value = "";
-    }
-}
-
-function enableChat() {
-    msgInput.disabled = false;
-    sendBtn.disabled = false;
-    attachBtn.disabled = false;
-    messagesDiv.innerHTML = '';
-}
-
-function disableChat() {
-    msgInput.disabled = true;
-    sendBtn.disabled = true;
-    attachBtn.disabled = true;
-    msgInput.value = '';
-}
-
-sendBtn.addEventListener('click', sendMessage);
-msgInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
-
-nextBtn.addEventListener('click', () => {
-    socket.emit('next');
-    closePeerConnection();
-    reportBtn.disabled = true;
-    nextBtn.disabled = true;
-});
-
-reportBtn.addEventListener('click', () => {
-    if (confirm("Report this user to admins?")) {
-        socket.emit('report_user');
-        appendSystemMessage("User reported. Disconnecting...");
-        socket.emit('next'); // Auto skip after report
+        typingIndicator.classList.remove('show');
     }
 });
 
-// --- FILE TRANSFER LOGIC ---
-socket.on('file_transfer', (data) => {
+// File transfer
+socket.on('file_transfer', data => {
     appendFile(data, 'msg-stranger');
     if (data.id) socket.emit('chat_received', data.id);
 });
 
-attachBtn.addEventListener('click', () => {
-    if (currentPartnerId) fileInput.click();
+// ── Chat Controls ─────────────────────────────────────────────────────────────
+function enableChat() {
+    msgInput.disabled  = false;
+    sendBtn.disabled   = false;
+    attachBtn.disabled = false;
+    document.querySelectorAll('.emoji-btn').forEach(b => b.disabled = false);
+    messagesDiv.innerHTML = '';
+    chatDot.classList.add('connected');
+}
+
+function disableChat() {
+    msgInput.disabled  = true;
+    sendBtn.disabled   = true;
+    attachBtn.disabled = true;
+    document.querySelectorAll('.emoji-btn').forEach(b => b.disabled = true);
+    msgInput.value = '';
+    chatDot.classList.remove('connected');
+    typingIndicator.classList.remove('show');
+}
+
+function sendMessage() {
+    const txt = msgInput.value.trim();
+    if (!txt || !currentPartnerId) return;
+    const payload = { id: 'msg-' + Date.now(), text: txt };
+    socket.emit('chat', payload);
+    appendMsg(payload, 'msg-self');
+    msgInput.value = '';
+    socket.emit('typing', false);
+}
+
+sendBtn.addEventListener('click', sendMessage);
+msgInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+
+// Typing detection
+let selfTypingTimer = null;
+msgInput.addEventListener('input', () => {
+    if (!currentPartnerId) return;
+    socket.emit('typing', true);
+    clearTimeout(selfTypingTimer);
+    selfTypingTimer = setTimeout(() => socket.emit('typing', false), 2000);
 });
+
+function appendMsg(data, cls) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + cls;
+    const txt   = typeof data === 'string' ? data : data.text;
+    const msgId = typeof data === 'string' ? null  : data.id;
+    if (cls === 'msg-self' && msgId) {
+        const sp  = document.createElement('span'); sp.textContent = txt;
+        const tic = document.createElement('span');
+        tic.id = 'tick-' + msgId;
+        tic.textContent = '✓';
+        tic.style.cssText = 'font-size:.72rem;color:#64748b;margin-left:7px;float:right;';
+        div.appendChild(sp); div.appendChild(tic);
+    } else { div.textContent = txt; }
+    messagesDiv.appendChild(div);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+function sysMsg(txt) {
+    const div = document.createElement('div');
+    div.className = 'msg msg-system';
+    div.textContent = txt;
+    messagesDiv.appendChild(div);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+// ── Next / Report / Panic ─────────────────────────────────────────────────────
+nextBtn.addEventListener('click', () => {
+    socket.emit('next');
+    closePeer();
+});
+
+panicBtn.addEventListener('click', () => {
+    if (confirm('Panic exit — disconnect and reload?')) window.location.reload();
+});
+
+reportBtn.addEventListener('click', () => {
+    const reason = prompt('Reason for report (optional):') || 'No reason';
+    socket.emit('report_user', reason);
+    sysMsg('User reported. Skipping...');
+    socket.emit('next');
+    closePeer();
+});
+
+blockBtn.addEventListener('click', () => {
+    showToast('🚫 User blocked for this session.');
+    socket.emit('next');
+    closePeer();
+});
+
+// ── File Transfer ─────────────────────────────────────────────────────────────
+attachBtn.addEventListener('click', () => { if (currentPartnerId) fileInput.click(); });
 
 fileInput.addEventListener('change', () => {
     const file = fileInput.files[0];
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { showToast('⚠ Max file size is 10MB'); fileInput.value=''; return; }
 
-    if (file.size > 8 * 1024 * 1024) {
-        alert("File size must be under 8MB.");
-        fileInput.value = '';
-        return;
-    }
-
-    const progId = 'upload_' + Date.now();
-    appendSystemMessage(`⏳ Preparing to send: ${file.name}...`, progId);
-
+    sysMsg('⏳ Sending: ' + file.name + '...');
     const reader = new FileReader();
-    reader.onload = (e) => {
-        const prog = document.getElementById(progId);
-        if (prog) prog.innerText = `✅ Sent: ${file.name}`;
-
-        const fileData = {
-            id: 'file-' + Date.now(),
-            filename: file.name,
-            filedata: e.target.result,
-            type: file.type
-        };
+    reader.onload = e => {
+        const fileData = { id:'file-'+Date.now(), filename:file.name, filedata:e.target.result, type:file.type };
         socket.emit('file_transfer', fileData);
         appendFile(fileData, 'msg-self');
+        sysMsg('✅ Sent: ' + file.name);
     };
     reader.readAsDataURL(file);
     fileInput.value = '';
 });
 
-function appendFile(data, type) {
-    const isImage = data.type.startsWith('image/');
+function appendFile(data, cls) {
     const div = document.createElement('div');
-    div.className = `msg ${type}`;
-    
-    const btnStyle = "display:inline-block; margin-top:8px; padding:6px 12px; background:var(--primary); color:#0b1121; text-decoration:none; font-weight:bold; border-radius:4px; font-size:0.85rem; text-align:center;";
-
-    const tickHtml = (type === 'msg-self' && data.id) 
-        ? `<div style="text-align:right; margin-top:5px;"><span id="status-${data.id}" style="font-size:0.75rem; color:#64748b;">✓</span></div>` 
-        : '';
-
-    if (isImage) {
-        div.innerHTML = `<strong>Sent an image:</strong><br><img src="${data.filedata}" alt="${data.filename}" style="max-width: 100%; border-radius: 8px; margin-top: 5px; cursor: pointer;" onclick="window.open('${data.filedata}', '_blank')" /><br><a href="${data.filedata}" download="${data.filename}" style="${btnStyle}">📥 DOWNLOAD IMAGE</a>${tickHtml}`;
+    div.className = 'msg ' + cls;
+    const btnStyle = 'display:inline-block;margin-top:7px;padding:5px 11px;background:var(--cyan);color:#060b18;font-weight:700;border-radius:5px;font-size:0.82rem;text-decoration:none;';
+    const tickHtml = (cls==='msg-self' && data.id) ? `<span id="tick-${data.id}" style="font-size:.72rem;color:#64748b;display:block;text-align:right;margin-top:4px;">✓</span>` : '';
+    if (data.type?.startsWith('image/')) {
+        div.innerHTML = `<strong>Image:</strong><br><img src="${data.filedata}" alt="${data.filename}" style="max-width:100%;border-radius:8px;margin-top:5px;cursor:pointer;" onclick="window.open('${data.filedata}','_blank')"><br><a href="${data.filedata}" download="${data.filename}" style="${btnStyle}">📥 Download</a>${tickHtml}`;
     } else {
-        div.innerHTML = `<div style="display: flex; flex-direction: column; gap: 5px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; margin-top: 5px;">
-            <span style="font-weight:bold;">📎 ${data.filename}</span>
-            <a href="${data.filedata}" download="${data.filename}" style="${btnStyle}">📥 DOWNLOAD FILE</a>
-            ${tickHtml}
-        </div>`;
+        div.innerHTML = `<div style="background:rgba(0,0,0,0.25);padding:9px;border-radius:7px;"><span>📎 ${data.filename}</span><br><a href="${data.filedata}" download="${data.filename}" style="${btnStyle}">📥 Download</a>${tickHtml}</div>`;
     }
-    
     messagesDiv.appendChild(div);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-// Start camera immediately to request permissions and show preview
-initMedia().catch(console.error);
+// ── Icebreaker ────────────────────────────────────────────────────────────────
+icebreakerBar.addEventListener('click', () => {
+    if (!currentPartnerId) return;
+    const q = ICEBREAKERS[icebreakerIndex++ % ICEBREAKERS.length];
+    icebreakerText.textContent = q;
+    const payload = { id:'msg-'+Date.now(), text:'🧊 ' + q };
+    socket.emit('chat', payload);
+    appendMsg(payload, 'msg-self');
+});
+
+// ── Emoji Reactions ───────────────────────────────────────────────────────────
+document.querySelectorAll('.emoji-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (!currentPartnerId) return;
+        const emoji = btn.dataset.emoji;
+        const payload = { id:'msg-'+Date.now(), text: emoji };
+        socket.emit('chat', payload);
+        appendMsg(payload, 'msg-self');
+    });
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setStatus(txt, state) {
+    statusEl.textContent = txt;
+    statusChip.className = 'status-chip ' + (state || 'searching');
+}
+
+let toastTimer = null;
+function showToast(msg) {
+    notifToast.textContent = msg;
+    notifToast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => notifToast.classList.remove('show'), 3500);
+}
+
+// Anti-freeze: reassign stream if remote video stalls
+let lastRemoteTime = -1;
+setInterval(() => {
+    if (currentPartnerId && remoteVideo.srcObject && remoteVideo.currentTime > 0) {
+        if (remoteVideo.currentTime === lastRemoteTime) {
+            const s = remoteVideo.srcObject;
+            remoteVideo.srcObject = null;
+            remoteVideo.srcObject = s;
+            remoteVideo.play().catch(() => {});
+        }
+        lastRemoteTime = remoteVideo.currentTime;
+    }
+}, 4000);

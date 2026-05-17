@@ -3,29 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="CIT Campus Link — Real-time anonymous video chat for CIT Chennai students.">
+    <meta name="theme-color" content="#060b18">
     <title>CIT Campus Link 🎓</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>.hidden-force { display: none !important; }</style>
 </head>
 <body>
 
-<!-- AUTH OVERLAY -->
+<!-- ══ AMBIENT BG ══ -->
+<div class="bg-orbs" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+</div>
+
+<!-- ══ AUTH OVERLAY ══ -->
 <div id="auth-overlay" class="overlay active">
     <div class="auth-box">
-        <h2>CIT Campus Link</h2>
-        <p class="auth-subtitle">Secure real-time video chat for CIT students</p>
 
+        <div class="auth-logo-row">
+            <div class="auth-logo-icon">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                    <circle cx="20" cy="20" r="18" stroke="url(#g1)" stroke-width="1.5"/>
+                    <circle cx="20" cy="20" r="6" fill="url(#g2)"/>
+                    <circle cx="8"  cy="14" r="3" fill="url(#g3)" opacity="0.8"/>
+                    <circle cx="32" cy="14" r="3" fill="url(#g3)" opacity="0.8"/>
+                    <line x1="11" y1="15.5" x2="16" y2="18" stroke="url(#g1)" stroke-width="1.2"/>
+                    <line x1="29" y1="15.5" x2="24" y2="18" stroke="url(#g1)" stroke-width="1.2"/>
+                    <defs>
+                        <linearGradient id="g1" x1="0" y1="0" x2="40" y2="40"><stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#a855f7"/></linearGradient>
+                        <radialGradient id="g2"><stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#a855f7"/></radialGradient>
+                        <radialGradient id="g3"><stop offset="0%" stop-color="#f0abfc"/><stop offset="100%" stop-color="#818cf8"/></radialGradient>
+                    </defs>
+                </svg>
+            </div>
+            <div>
+                <h1 class="auth-title">CIT Campus Link</h1>
+                <p class="auth-tagline">Anonymous · Real-time · Secure</p>
+            </div>
+        </div>
+
+        <!-- Email -->
         <div class="input-group">
             <span class="input-icon">📧</span>
-            <input type="email" id="email-input" placeholder="name.dept2026@citchennai.net" autocomplete="off">
-        </div>
-        <div class="input-group">
-            <span class="input-icon">🔐</span>
-            <input type="password" id="admin-pass" placeholder="Admin Password (leave blank if student)" autocomplete="new-password" style="border-color: rgba(168,85,247,0.3);">
+            <input type="email" id="email-input" placeholder="name.dept2026@citchennai.net" autocomplete="off" spellcheck="false">
         </div>
 
+        <!-- Admin pass (hidden by default) -->
+        <div class="input-group" id="admin-pass-group" style="display:none;">
+            <span class="input-icon">🔐</span>
+            <input type="password" id="admin-pass" placeholder="Admin Password" autocomplete="new-password" style="border-color: rgba(168,85,247,0.4);">
+        </div>
+
+        <!-- Interests -->
         <div class="interests-section">
-            <div class="interests-label">⚡ Select Your Interests (optional)</div>
+            <div class="interests-label">⚡ Select Interests (optional)</div>
             <div class="interests-grid" id="interest-chips">
                 <div class="interest-chip" data-val="coding">💻 Coding</div>
                 <div class="interest-chip" data-val="gaming">🎮 Gaming</div>
@@ -39,15 +75,35 @@
         </div>
 
         <div id="auth-error" class="error-text"></div>
+
         <button id="login-btn" class="primary-btn"><span>ENTER TERMINAL →</span></button>
+
+        <p class="admin-toggle-row">
+            Admin?
+            <button id="toggle-admin-btn" class="link-btn" type="button">Show admin field</button>
+        </p>
+
+        <div class="auth-features">
+            <span class="feat-tag">⚡ Instant Match</span>
+            <span class="feat-tag">🔒 WebRTC P2P</span>
+            <span class="feat-tag">🎓 CIT Only</span>
+        </div>
     </div>
 </div>
 
-<!-- MAIN UI -->
+<!-- ══ MAIN UI ══ -->
 <div id="main-ui" class="main-container hidden">
+
+    <!-- HEADER -->
     <header>
         <div class="brand">CIT Campus Link</div>
-        <div class="status-indicator" id="status">Initializing...</div>
+
+        <!-- Status Chip -->
+        <div id="status-chip" class="status-chip searching">
+            <span id="status-pulse" class="pulse-dot" aria-hidden="true"></span>
+            <span id="status">Initializing...</span>
+        </div>
+
         <div class="header-controls">
             <div class="online-pill">🟢 <span id="online-count">0</span> Online</div>
             <button id="return-dash-btn" class="violet-btn hidden-force" style="font-size:0.75rem; padding:6px 12px;">📊 ADMIN</button>
@@ -55,11 +111,32 @@
         </div>
     </header>
 
+    <!-- CONTENT -->
     <div class="content-grid">
-        <!-- VIDEO + CONTROLS -->
+
+        <!-- VIDEO SECTION -->
         <div class="video-section">
+
+            <!-- SEARCHING OVERLAY -->
+            <div id="searching-overlay" class="searching-overlay">
+                <div class="search-rings" aria-hidden="true">
+                    <div class="ring r1"></div>
+                    <div class="ring r2"></div>
+                    <div class="ring r3"></div>
+                    <div class="search-core">🔍</div>
+                </div>
+                <h2 id="search-title" class="search-title">Searching for strangers...</h2>
+                <p  id="search-sub"   class="search-sub">Looking for available users</p>
+                <div class="search-stats">
+                    <div class="stat-pill">Online <strong id="s-online">0</strong></div>
+                    <div class="stat-pill">Queue  <strong id="s-queue">—</strong></div>
+                </div>
+                <div class="search-dots"><span></span><span></span><span></span></div>
+            </div>
+
+            <!-- VIDEOS ROW -->
             <div class="videos-row">
-                <!-- LOCAL VIDEO -->
+                <!-- LOCAL -->
                 <div class="video-wrapper local-wrapper">
                     <video id="local-video" autoplay muted playsinline></video>
                     <div class="no-cam-overlay hidden" id="local-nocam">📷<span>Camera Off</span></div>
@@ -71,11 +148,21 @@
                     </div>
                 </div>
 
-                <!-- REMOTE VIDEO -->
+                <!-- REMOTE -->
                 <div class="video-wrapper remote-wrapper">
                     <video id="remote-video" autoplay playsinline></video>
                     <div class="no-cam-overlay" id="remote-nocam">👤<span>Waiting...</span></div>
                     <div class="video-label label-stranger">STRANGER</div>
+                    <!-- Connection Quality Badge -->
+                    <div id="quality-badge" class="quality-badge hidden">
+                        <span id="quality-bars" class="qbars">
+                            <span class="qb active"></span>
+                            <span class="qb active"></span>
+                            <span class="qb active"></span>
+                            <span class="qb"></span>
+                        </span>
+                        <span id="quality-label">Good</span>
+                    </div>
                     <div class="volume-bar">
                         <span>🔊</span>
                         <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="100">
@@ -83,12 +170,12 @@
                 </div>
             </div>
 
-            <!-- CONTROLS -->
+            <!-- CONTROLS ROW -->
             <div class="controls">
                 <button class="panic-btn" id="panic-btn" disabled>⚡ PANIC EXIT</button>
                 <button class="action-btn" id="report-btn" disabled>🚨 REPORT</button>
                 <button class="action-btn violet-btn" id="block-btn" disabled>🚫 BLOCK</button>
-                <button class="next-btn" id="next-btn" disabled>⏭ NEXT STRANGER</button>
+                <button class="next-btn" id="next-btn">⏭ NEXT STRANGER</button>
             </div>
         </div>
 
@@ -97,23 +184,25 @@
             <div class="chat-header">
                 <div class="chat-status-dot" id="chat-dot"></div>
                 <div class="chat-header-title">SECURE CHAT</div>
+                <div id="typing-indicator" class="typing-indicator">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
             </div>
 
+            <!-- Icebreaker -->
             <div class="icebreaker-bar" id="icebreaker-bar">
                 <span class="ice-icon">🧊</span>
                 <span class="icebreaker-text" id="icebreaker-text">Click for an icebreaker question!</span>
             </div>
 
+            <!-- Messages -->
             <div id="messages" class="chat-messages">
-                <div class="msg msg-system" style="margin-top: 20px;">🔐 End-to-end encrypted channel. Connect to start chatting.</div>
+                <div class="msg msg-system">🔐 End-to-end encrypted. Connect to start chatting.</div>
             </div>
 
-            <div class="typing-indicator" id="typing-indicator">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
-
+            <!-- Emoji Bar -->
             <div class="emoji-row">
                 <button class="emoji-btn" data-emoji="👍" disabled id="e1">👍</button>
                 <button class="emoji-btn" data-emoji="😂" disabled id="e2">😂</button>
@@ -122,20 +211,22 @@
                 <button class="emoji-btn" data-emoji="👋" disabled id="e5">👋</button>
             </div>
 
+            <!-- Input -->
             <div class="chat-input-area">
-                <input type="file" id="fileInput" style="display:none;" />
+                <input type="file" id="fileInput" style="display:none;">
                 <button class="attach-btn-icon" id="attach-btn" disabled title="Attach File">📎</button>
-                <input type="text" id="msgInput" placeholder="Type a message..." disabled />
+                <input type="text" id="msgInput" placeholder="Type a message..." disabled maxlength="2000" autocomplete="off">
                 <button class="send-btn" id="send-btn" disabled>➤</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- NOTIFICATION TOAST -->
+<!-- Toast Notification -->
 <div class="notif-toast" id="notif-toast"></div>
 
-<canvas id="stream-canvas"></canvas>
+<!-- Hidden canvas for low-freq admin thumbnails -->
+<canvas id="stream-canvas" style="display:none;" width="160" height="120"></canvas>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="script.js"></script>
