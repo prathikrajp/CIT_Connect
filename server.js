@@ -29,12 +29,16 @@ const rateLimit  = require('express-rate-limit');
 const app    = express();
 const server = http.createServer(app);
 
+// Trust reverse proxy (Railway, Render, Vercel all sit behind one)
+app.set('trust proxy', 1);
+
 // HTTP rate limiting — global brute-force protection
 app.use(rateLimit({
     windowMs: 15 * 60 * 1000, // 15 min window
     max: 300,
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    validate: { xForwardedForHeader: false }
 }));
 
 app.use(express.static(path.join(__dirname, 'public')));

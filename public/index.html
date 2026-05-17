@@ -228,7 +228,24 @@
 <!-- Hidden canvas for low-freq admin thumbnails -->
 <canvas id="stream-canvas" style="display:none;" width="160" height="120"></canvas>
 
-<script src="/socket.io/socket.io.js"></script>
+<!--
+  ╔═══════════════════════════════════════════════════════════════════╗
+  ║  DEPLOYMENT CONFIG                                                ║
+  ║  Uncomment and set __BACKEND_URL to your Railway URL when         ║
+  ║  deploying frontend separately on Vercel.                         ║
+  ║  Leave commented for Railway/localhost (same-origin) deploys.     ║
+  ╚═══════════════════════════════════════════════════════════════════╝
+-->
+<!-- Set Railway backend URL (uncomment below for Vercel frontend deploy) -->
+<!-- <script>window.__BACKEND_URL = 'https://cit-campuc-link-production.up.railway.app';</script> -->
+
+<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+<script>
+  // Fallback: if CDN fails, load from local server synchronously
+  if (typeof io === 'undefined') {
+    document.write('<script src="/socket.io/socket.io.js"><\/script>');
+  }
+</script>
 <script src="script.js"></script>
 </body>
 </html>

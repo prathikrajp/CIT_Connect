@@ -1,4 +1,5 @@
-const socket = io();
+const BACKEND_URL = window.__BACKEND_URL || '';
+const socket = io(BACKEND_URL || undefined);
 
 // UI Elements
 const adminAuth = document.getElementById('admin-auth');

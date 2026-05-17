@@ -1,7 +1,10 @@
 'use strict';
 
 // ── Socket ────────────────────────────────────────────────────────────────────
-const socket = io({ transports: ['websocket', 'polling'] });
+// Auto-detect backend: if served from Vercel (different origin), use BACKEND_URL.
+// If served from Railway/localhost (same origin), connect to self.
+const BACKEND_URL = window.__BACKEND_URL || ''; // Set in index.html for Vercel deploy
+const socket = io(BACKEND_URL || undefined, { transports: ['websocket', 'polling'] });
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -174,7 +177,7 @@ async function initMedia() {
         setStatus('Requesting camera...', 'searching');
 
         const constraints = {
-            video: { width:{ideal:854,max:1280}, height:{ideal:480,max:720}, facingMode },
+            video: { width:{ideal:1280,max:1920}, height:{ideal:720,max:1080}, facingMode },
             audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true }
         };
 
@@ -313,8 +316,8 @@ function createPeer(partnerId, initiator) {
             .then(o => peerConnection.setLocalDescription(o))
             .then(() => {
                 socket.emit('webrtc_offer', { partnerId, offer: peerConnection.localDescription });
-                // Boost video bitrate for better quality
-                setBitrate(1500);
+                // Boost video bitrate for max HD quality
+                setBitrate(2500);
             })
             .catch(console.error);
     }

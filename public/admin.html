@@ -57,7 +57,10 @@
         </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
+    <!-- Set Railway backend URL (uncomment below for Vercel frontend deploy) -->
+    <!-- <script>window.__BACKEND_URL = 'https://cit-campuc-link-production.up.railway.app';</script> -->
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <script>if(typeof io==='undefined'){document.write('<script src="/socket.io/socket.io.js"><\\/script>');}</script>
     <script src="admin.js"></script>
 </body>
 </html>
