@@ -42,3 +42,4 @@ Built entirely independently but securely bridged into the main system. Accessed
 2. Make sure you have installed the server modules: `npm install express socket.io`
 3. Launch the central terminal server: `node server.js`
 4. Access locally via `http://localhost:3000` or attach an ngrok tunnel.
+site:https://cit-campuc-link-production.up.railway.app/
